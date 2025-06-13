@@ -1,4 +1,4 @@
 .venv
 .env
 echo "database/chroma_db/"
-database/chroma_db/
+echo "database/chroma_db/"
