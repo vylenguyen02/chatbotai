@@ -45,12 +45,20 @@ def embedding():
 from langchain_community.vectorstores import Chroma
 
 def vectorstores(splits, embeddings):
-    persist_directory = "chroma_db"  # or any folder path you want
-    vectordb = Chroma.from_documents(
-    documents=splits,
-    embedding=embeddings,
-    persist_directory=persist_directory
-)
+    if os.path.exists("chroma_db"):
+        vector_store = Chroma(
+        collection_name="example_collection",
+        embedding_function=embeddings,
+        persist_directory="./chroma_db",  # Where to save data locally, remove if not necessary
+    )
+        return vector_store
+    else:
+        persist_directory = "chroma_db"  # or any folder path you want
+        vectordb = Chroma.from_documents(
+        documents=splits,
+        embedding=embeddings,
+        persist_directory=persist_directory)
+        return vectordb
     
     print(vectordb._collection.count()) 
     return vectordb
