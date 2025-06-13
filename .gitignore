@@ -1,4 +1,4 @@
 .venv
 .env
-database/chrome
-database/chrome_db
+database/chroma/
+database/chroma_db/
