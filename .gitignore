@@ -1,4 +1,3 @@
 .venv
 .env
-database/chroma_db/
-database/chroma/
+echo "database/chroma_db/" >> .gitignore
