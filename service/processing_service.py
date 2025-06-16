@@ -1,9 +1,7 @@
 import os
 import openai
 import sys
-import getpass
 from langchain_openai import ChatOpenAI
-import streamlit as st
 import bs4
 sys.path.append('../..')
 
@@ -12,8 +10,7 @@ _ = load_dotenv(find_dotenv()) # read local .env file
 
 # Initialize LLM
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 async def loading(pdf_path):
@@ -42,25 +39,24 @@ def embedding():
 )   
     return embed
 
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
+import shutil
 
 def vectorstores(splits, embeddings):
-    if os.path.exists("chroma_db"):
-        vector_store = Chroma(
-        collection_name="example_collection",
-        embedding_function=embeddings,
-        persist_directory="./chroma_db",  # Where to save data locally, remove if not necessary
-    )
-        return vector_store
-    else:
-        persist_directory = "chroma_db"  # or any folder path you want
-        vectordb = Chroma.from_documents(
+    persist_directory = "chroma_db"
+
+    # Delete and rebuild the DB if it already exists
+    if os.path.exists(persist_directory):
+        shutil.rmtree(persist_directory)
+
+    # Create new Chroma from documents
+    vectordb = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
-        persist_directory=persist_directory)
-        return vectordb
+        persist_directory=persist_directory,
+        collection_name="example_collection",
+    )
     
-    print(vectordb._collection.count()) 
     return vectordb
 
 def load_vectorstore():
@@ -90,8 +86,9 @@ def llm(vectordb, question):
     base_compressor=compressor,
     base_retriever=base_retriever
     )
-    compressed_docs = compression_retriever.get_relevant_documents(question)
+    compressed_docs = compression_retriever.invoke(question)
     pretty_print_docs(compressed_docs)
+ 
 
 import asyncio
 async def main():
@@ -99,7 +96,7 @@ async def main():
     splits = splitting(load)
     embed = embedding()
     vector_db = vectorstores(splits, embed)
-    llm(vector_db, "High CPU utilization là gì?")
+    llm(vector_db, "What's the weather today?")
 
 if __name__ == "__main__":
     asyncio.run(main())
