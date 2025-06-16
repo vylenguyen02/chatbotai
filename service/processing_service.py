@@ -1,5 +1,4 @@
 import os
-import openai
 import sys
 from langchain_openai import ChatOpenAI
 sys.path.append('../..')
@@ -35,17 +34,14 @@ def splitting(pages):
     return all_splits
 
 from langchain_openai import OpenAIEmbeddings  
-from langchain_chroma import Chroma
-
-def embedding(all_splits):
-    embed=OpenAIEmbeddings(
-    model="azure-text-embedding-3-large",  # or "text-embedding-ada-002"
-    api_key=os.environ["OPENAI_API_KEY"],
-    base_url=os.environ['AZURE_OPENAI_ENDPOINT']
-)   
-    
-    vectorstore_db = Chroma.from_documents(documents=all_splits, embedding=embed)
+from langchain_community.vectorstores import Chroma
+def embedding(all_splits, embedder):
+    vectorstore_db = Chroma.from_documents(documents=all_splits, embedding=embedder, persist_directory="../database/chroma_db")
+    vectorstore_db.persist()
     return vectorstore_db
+
+def chroma_db_exists(path):
+    return os.path.isdir(path) and len(os.listdir(path)) > 0
 
 from langchain import hub
 prompt = hub.pull("rlm/rag-prompt")
@@ -73,10 +69,24 @@ def generate(state: State):
 
 import asyncio
 async def main():
-    load = await loading("../database/avn-doc_database.pdf")
-    splits = splitting(load)
-    vector_db = embedding(splits)
-    test_question = "Sử dụng bộ lọc để làm gì?"
+    file_name = input("Please enter file name: ")
+    test_question = input("Ask something. ")
+    file_path = "../database/" + file_name
+    persist_direct = "../database/chroma_db"
+
+    embedder = OpenAIEmbeddings(
+    model="azure-text-embedding-3-large",
+    api_key=os.environ["OPENAI_API_KEY"],
+    base_url=os.environ['AZURE_OPENAI_ENDPOINT']
+)
+    
+    if os.path.exists(persist_direct) and os.listdir(persist_direct):
+        vector_db = Chroma(persist_directory=persist_direct, embedding_function=embedder)
+    else:
+        load = await loading(f"../database/{file_name}")
+        splits = splitting(load)
+        vector_db = embedding(splits, embedder)  
+    
     state = {"question": test_question, "context": [], "answer": ""}
 
     # Retrieve relevant docs
@@ -85,7 +95,8 @@ async def main():
 
     # Generate answer
     answer_result = generate(state)
-    print("Answer:", answer_result["answer"])
+    print(f'Context: {state["context"]}\n\n')
+    print(f'Answer: {result["context"]}')
 
 if __name__ == "__main__":
     asyncio.run(main())
