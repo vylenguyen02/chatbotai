@@ -5,7 +5,7 @@ sys.path.append('../..')
 
 from langchain_community.vectorstores import Chroma
 
-import service.chatbot.embedding_chatbot as embedding_chatbot, service.chatbot.retrieving_chatbot as retrieving_chatbot, service.chatbot.generating_chatbot as generating_chatbot
+import service.chatbot.langchain.embedding_langchain as embedding_langchain, service.chatbot.langchain.retrieving_langchain as retrieving_langchain, service.chatbot.langchain.generating_langchain as generating_langchain
 
 from dotenv import load_dotenv, find_dotenv
 _ = load_dotenv(find_dotenv()) # read local .env file
@@ -36,17 +36,17 @@ async def main():
     if os.path.exists(persist_direct) and os.listdir(persist_direct):
         vector_db = Chroma(persist_directory=persist_direct, embedding_function=embedder)
     else:
-        vector_db = await embedding_chatbot.embedding(file_name, embedder)  
+        vector_db = await embedding_langchain.embedding(file_name, embedder)  
 
     state = {"question": test_question, "context": [], "answer": ""}
 
     # Retrieve relevant docs
-    result = retrieving_chatbot.retrieve(state, vector_db)
+    result = retrieving_langchain.retrieve(state, vector_db)
     state["context"] = result["context"]
 
     # Generate answer
-    answer_result = generating_chatbot.generate(state, llm)
-    print(f'Answer: {result["context"]}')
-
+    answer_result = generating_langchain.generate(state, llm)
+    #print(f'Answer: {result["context"]}')
+    
 if __name__ == "__main__":
     asyncio.run(main())

@@ -1,7 +1,8 @@
 from langchain_openai import OpenAIEmbeddings  
 from langchain_community.vectorstores import Chroma
-from service.chatbot.splitting_chatbot import splitting
-from service.chatbot.load_chatbot import loading
+from service.chatbot.langchain.splitting_langchain import splitting
+from service.chatbot.langchain.load_langchain import loading
+
 async def embedding(file_name, embedder):
     load = await loading(f"../docs/{file_name}")
     all_splits = splitting(load)
