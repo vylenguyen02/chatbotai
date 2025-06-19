@@ -1,6 +1,5 @@
 from langchain_community.document_loaders import PyPDFLoader
 
-# loading
 async def loading(pdf_path):
     loader = PyPDFLoader(pdf_path)
     pages = []

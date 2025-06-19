@@ -2,65 +2,20 @@ import os
 import sys
 from langchain_openai import ChatOpenAI
 sys.path.append('../..')
-
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from pymongo import MongoClient
-
-
 from dotenv import load_dotenv, find_dotenv
 _ = load_dotenv(find_dotenv()) # read local .env file
 
-
+from service.chatbot.langchain.embedding_langchain import embedding
+from service.chatbot.langchain.generating_langchain import generate
+from service.chatbot.langchain.retrieving_langchain import retrieve
 
 def folder_has_any_file(folder_path):
     return any(
         os.path.isfile(os.path.join(folder_path, f)) and not f.startswith(".")
         for f in os.listdir(folder_path)
     )
-
-
-from langchain_community.document_loaders import PyPDFLoader
-
-async def loading(pdf_path):
-    loader = PyPDFLoader(pdf_path)
-    pages = []
-    async for page in loader.alazy_load():
-        pages.append(page)
-    return pages
-
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-def splitting(pages):
-    text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,  # chunk size (characters)
-    chunk_overlap=200,  # chunk overlap (characters)
-    add_start_index=True,  # track index in original document
-)
-    all_splits = text_splitter.split_documents(pages)
-    return all_splits
-
-from typing import TypedDict, List
-from langchain.schema import Document
-# Define state for application
-class State(TypedDict):
-    question: str
-    context: List[Document]
-    answer: str
-
-
-def retrieve(state: State, vectorstore_db):
-    retrieved_docs = vectorstore_db.similarity_search(state["question"])
-    return {"context": retrieved_docs}
-
-from langchain import hub
-prompt = hub.pull("rlm/rag-prompt")
-
-def generate(state: State, llm):
-    docs_content = "\n\n".join(doc.page_content for doc in state["context"])
-    messages = prompt.invoke({"question": state["question"], "context": docs_content})
-    response = llm.invoke(messages)
-    return {"answer": response.content}
-
 
 from langchain_openai import OpenAIEmbeddings  
 
@@ -98,16 +53,7 @@ async def main():
         for file in os.listdir(folder_path):
             file_path = os.path.join(folder_path, file)
             if os.path.isfile(file_path):
-                pages = await loading(file_path)
-                all_splits = splitting(pages)
-                vectorstore_db = MongoDBAtlasVectorSearch.from_documents(
-                    documents=all_splits,
-                    embedding=embedder,
-                    collection=collection,
-                    index_name=search_index
-                )
-                ids=[val for val in range(len(all_splits))],
-                vectorstore_db.add_documents(all_splits,ids=ids)
+                vectorstore_db = embedding(file, embedder, folder_path, collection, search_index)
                 os.remove(file_path)
     else:
         vectorstore_db = MongoDBAtlasVectorSearch(
