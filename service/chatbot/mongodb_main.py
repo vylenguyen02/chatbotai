@@ -24,10 +24,10 @@ async def main():
     client = MongoClient(os.environ["MONGODB_ATLAS_CLUSTER_URI"])
 
     db = os.environ["DB_NAME"]
-    collection = os.environ["COLLECTION_NAME"]
+    collection_name = os.environ["COLLECTION_NAME"]
     search_index = os.environ["ATLAS_VECTOR_SEARCH_INDEX_NAME"]
 
-    mongo_db = client[db][collection]
+    collection = client[db][collection_name]
 
 
     llm = ChatOpenAI(
@@ -43,9 +43,12 @@ async def main():
         api_key=os.environ["OPENAI_API_KEY"],
         base_url=os.environ['AZURE_OPENAI_ENDPOINT']
     )
-    client = MongoClient(os.environ["MONGODB_ATLAS_CLUSTER_URI"])
-    collection = client[os.environ["DB_NAME"]][os.environ["COLLECTION_NAME"]]
-
+    vectorstore_db = MongoDBAtlasVectorSearch.from_connection_string(
+        connection_string=os.environ["MONGODB_ATLAS_CLUSTER_URI"],
+        namespace=f"{db}.{collection_name}",
+        embedding=embedder,
+        index_name=search_index,
+    )
 # Embed and upload to MongoDB Atlas
     
     folder_path = "../../docs"
@@ -53,18 +56,18 @@ async def main():
         for file in os.listdir(folder_path):
             file_path = os.path.join(folder_path, file)
             if os.path.isfile(file_path):
-                vectorstore_db = embedding(file, embedder, folder_path, collection, search_index)
+                vectorstore_db = await embedding(file, embedder, collection, search_index)
                 os.remove(file_path)
     else:
         vectorstore_db = MongoDBAtlasVectorSearch(
             collection=collection,
-            embedding=embedder,
+            embedding=embedder,  # same embedding model used when saving
             index_name=search_index,
-            relevance_score_fn="cosine",
+            relevance_score_fn="cosine"
         )
     state = {"question": test_question, "context": [], "answer": ""}
 
-    # Retrieve relevant docs
+     # Retrieve relevant docs
     result = retrieve(state, vectorstore_db)
     state["context"] = result["context"]
 
