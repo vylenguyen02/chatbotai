@@ -13,6 +13,10 @@ async def embedding(file_name, embedder, collection, search_index):
                     collection=collection,
                     index_name=search_index
                 )
+    # vectorstore_db.create_vector_search_index(dimensions=3072)
     ids=[str(val) for val in range(len(all_splits))],
+    vectorstore_db.create_vector_search_index(dimensions=3072)
+
     vectorstore_db.add_documents(all_splits,ids=ids[0])
+    
     return vectorstore_db

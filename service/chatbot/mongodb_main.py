@@ -57,7 +57,7 @@ async def main():
             file_path = os.path.join(folder_path, file)
             if os.path.isfile(file_path):
                 vectorstore_db = await embedding(file, embedder, collection, search_index)
-                os.remove(file_path)
+                # os.remove(file_path)
     else:
         vectorstore_db = MongoDBAtlasVectorSearch(
             collection=collection,
