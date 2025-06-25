@@ -2,6 +2,13 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_mongodb import MongoDBAtlasVectorSearch
 import os
+from typing import TypedDict, List
+from langchain.schema import Document
+from langchain import hub
+class State(TypedDict):
+    question: str
+    context: List[Document]
+    answer: str
 
 class FileHandlingService:
     def __init__(self, llm, pdf_path, embedder, collection, search_index):
@@ -47,7 +54,15 @@ class FileHandlingService:
         vectorstore.add_documents(all_splits,ids=ids[0])
         return vectorstore
 
+    def retrieve(self, state: State, vectorstore):
+        retrieved_docs = vectorstore.similarity_search(state["question"])
+        return {"context": retrieved_docs}
     
+    def generate(self, state: State):
+        prompt = hub.pull("rlm/rag-prompt")
+        docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+        messages = prompt.invoke({"question": state["question"], "context": docs_content})
+        response = self.llm.invoke(messages)
+        return {"answer": response.content}
 
-    
-        
+# Define state for application

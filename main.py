@@ -1,8 +1,9 @@
 import asyncio
-from service.file_handling_service import FileHandlingService
+from service.file_handling_service import FileHandlingService, State
 from langchain_openai import OpenAIEmbeddings  
 from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
+from langchain_mongodb import MongoDBAtlasVectorSearch
 import os
 
 
@@ -34,6 +35,22 @@ async def main():
                     all_splits = self_service.splitting(docs)
                     vectorstore_db = self_service.embed_documents(all_splits, embedder, collection, search_index)
                     os.remove(new_file_path)
+    else:
+         vectorstore_db = MongoDBAtlasVectorSearch(
+            collection=collection,
+            embedding=embedder,  # same embedding model used when saving
+            index_name=search_index,
+            relevance_score_fn="cosine"
+        )
+    test_question = input("Ask something\n")
+    state = {"question": test_question, "context": [], "answer": ""}
 
+     # Retrieve relevant docs
+    result = self_service.retrieve(state, vectorstore_db)
+    state["context"] = result["context"]
+
+    # Generate answer
+    answer_result = self_service.generate(state)
+    print(f'Answer: {result["context"]}')
 if __name__ == "__main__":
     asyncio.run(main())
