@@ -5,6 +5,7 @@ import os
 from typing import TypedDict, List
 from langchain.schema import Document
 from langchain import hub
+
 class State(TypedDict):
     question: str
     context: List[Document]
