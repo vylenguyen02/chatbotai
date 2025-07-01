@@ -1,10 +1,16 @@
 import asyncio
-from service.file_handling_service import FileHandlingService, State
+from service.file_handling_service import FileHandlingService
 from langchain_openai import OpenAIEmbeddings  
 from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
 from langchain_mongodb import MongoDBAtlasVectorSearch
 import os
+from langgraph.graph import MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode
+import uuid
+from langchain_core.messages import SystemMessage
+from langchain_mongodb import MongoDBChatMessageHistory
+
 
 
 client = MongoClient(os.environ["MONGODB_ATLAS_CLUSTER_URI"])
@@ -25,6 +31,7 @@ llm = ChatOpenAI(
             api_key=os.environ["AZURE_OPENAI_API_VERSION"]
         )
 
+
 async def main():
     self_service = FileHandlingService(llm, "docs/", embedder, collection, search_index)
     if self_service.folder_has_any_file():
@@ -42,15 +49,40 @@ async def main():
             index_name=search_index,
             relevance_score_fn="cosine"
         )
-    test_question = input("Ask something\n")
-    state = {"question": test_question, "context": [], "answer": ""}
+        
+    session_id = input("Enter your session ID: ").strip()
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        input_message = input("Ask something!\n")
+        title_prompt = [SystemMessage(content="You're a helpful assistant. Based on the following message, generate a short and meaningful title (1–3 words) that describes the topic:\n\n" + input_message)
+    ]
+        generated_title = llm.invoke(title_prompt)
+        generated_title = generated_title.content.strip().replace(" ", "_")
+        session_id = f"{generated_title}_{str(uuid.uuid4())[:8]}"
 
-     # Retrieve relevant docs
-    result = self_service.retrieve(state, vectorstore_db)
-    state["context"] = result["context"]
+    else: 
+        input_message = input("Ask something!\n")
+        
+    history = MongoDBChatMessageHistory(
+    connection_string=os.environ["MONGODB_ATLAS_CLUSTER_URI"],
+    session_id=session_id
+    )
+    
+    history.add_user_message(input_message)
+    tools = ToolNode([self_service.make_retrieve(vectorstore_db)])
 
-    # Generate answer
-    answer_result = self_service.generate(state)
-    print(f'Answer: {result["context"]}')
+    graph = self_service.graph_building(tools, vectorstore_db)
+    final_ai_message = None
+    for step in graph.stream(
+        {"messages": history.messages + [{"role": "user", "content": input_message}]},
+        stream_mode="values",
+    ):
+        step["messages"][-1].pretty_print()
+        if step["messages"][-1].type == "ai":
+            final_ai_message = step["messages"][-1].content
+
+    if final_ai_message:
+        history.add_ai_message(final_ai_message)
+        # print(final_ai_message)
 if __name__ == "__main__":
     asyncio.run(main())
